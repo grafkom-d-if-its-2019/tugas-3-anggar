@@ -8,7 +8,6 @@ uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 uniform float theta;
 uniform float yscale;
-uniform vec3 shift;
 varying vec3 fColor;
 
 void main() {
@@ -17,7 +16,7 @@ void main() {
 		1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
-		shift.x, shift.y, shift.z, 1.0
+		0.2, 0.0, 0.0, 1.0
 	);
 	mat4 rotateX = mat4(
 		1.0, 0.0, 0.0, 0.0,
@@ -49,5 +48,5 @@ void main() {
 		0.0, 0.0, 0.0, 1.0
 	);
 
-	gl_Position = projectionMatrix * viewMatrix * modelMatrix * translate * rotateY * vec4(vPosition, 1.0);
+	gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(vPosition, 1.0);
 }
