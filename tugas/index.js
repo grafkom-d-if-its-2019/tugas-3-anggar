@@ -6,7 +6,7 @@
 
   function main() {
     // Register Callbacks
-    window.addEventListener('resize', resizer);
+    // window.addEventListener('resize', resizer);
 
     // Get canvas element and check if WebGL enabled
     canvas = document.getElementById("glcanvas");
@@ -20,193 +20,140 @@
 
     gl.useProgram(program);
 
-    resizer();
-  }
+    const vertices = [
 
-  function draw() {
-    gl.clearColor(0, 0.07, 0.1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    ];
+
+    const cubePoints = [
+      [-0.5, -0.5,  0.5],
+      [-0.5,  0.5,  0.5],
+      [ 0.5,  0.5,  0.5],
+      [ 0.5, -0.5,  0.5],
+      [-0.5, -0.5, -0.5],
+      [-0.5,  0.5, -0.5],
+      [ 0.5,  0.5, -0.5],
+      [ 0.5, -0.5, -0.5],
+    ];
+
+    const cubeColors = [
+      [],
+      [1.0, 0.0, 0.0],
+      [0.0, 1.0, 0.0],
+      [0.0, 0.0, 1.0],
+      [1.0, 1.0, 1.0],
+      [1.0, 0.5, 0.0],
+      [1.0, 1.0, 0.0],
+    ];
+
+    function quad(a, b, c, d) {
+      var indices = [a, b, c, a, c, d];
+      for (const i of indices) {
+        vertices.push(...cubePoints[i]);
+        vertices.push(...cubeColors[a]);
+      }
+    }
+    quad(1, 0, 3, 2);
+    quad(2, 3, 7, 6);
+    quad(3, 0, 4, 7);
+    quad(4, 5, 6, 7);
+    quad(5, 4, 0, 1);
+    quad(6, 5, 1, 2);
+
+    // Buffer object for communication between CPU Memory and GPU Memory
+    const vertexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
     
-    var AOuterVertices = new Float32Array([
-      -0.85, -0.85,     -0.6, +0.8,     -0.4, +0.8,     -0.15, -0.85,
-      -0.3, -0.85,     -0.4, -0.3,     -0.6, -0.3,       -0.7, -0.85
-      // -0.5, -0.5,   -0.5, +0.5,  0.0, +0.5,  0.0, 0.0,  +0.5, -0.5
-    ]);
-    var AInnerVertices = new Float32Array([
-      -0.42, 0.0,     -0.58, 0.0,   -0.5, +0.5
-    ]);
+    // Connection between attributes
+    const vPostion = gl.getAttribLocation(program, 'vPosition');
+    const vColor = gl.getAttribLocation(program, 'vColor');
+    gl.vertexAttribPointer(
+      vPostion, //
+      3,        // Number of elements in attribute
+      gl.FLOAT, //
+      gl.FALSE, 
+      6 * Float32Array.BYTES_PER_ELEMENT,
+      0
+      );
+    gl.vertexAttribPointer(vColor, 3, gl.FLOAT, gl.FALSE,
+      6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+      
+      gl.enableVertexAttribArray(vPostion);
+      gl.enableVertexAttribArray(vColor);
 
-    var ABoldOuterVertices = new Float32Array([
-      -0.85, -0.85,     -0.6, +0.8,     -0.7, -0.85,     
-      -0.6, +0.8,     -0.7, -0.85,     -0.5, +0.5,
-      -0.4, +0.8,     -0.6, +0.8,     -0.5, +0.5,
-      -0.5, +0.5,     -0.15, -0.85,     -0.4, +0.8,
-      -0.5, +0.5,     -0.15, -0.85,     -0.3, -0.85,
+    document.addEventListener('keydown', onKeyDown);
 
-      -0.42, 0.0,     -0.58, 0.0,     -0.3, -0.4, 
-      -0.3, -0.3,     -0.7, -0.3,     -0.58, 0.0, 
-    ]);
-
-    ABoldOuterVertices.forEach ((_, i) => {
-      if(i%2==0)    
-        ABoldOuterVertices[i] += 1;
-    })
-
+    // Connection for uniform value for translation purpose
     const thetaUniformLocation = gl.getUniformLocation(program, 'theta');
-    const offsetXUniformLocation = gl.getUniformLocation(program, 'offsetX');
-    const yscaleUniformLocation = gl.getUniformLocation(program, 'yscale');    
-    let theta = 0;
-    let yscaler = 0.0;
-    let yscale = 0.0;
-    yscaler = 0.0052;
+    let theta = Math.PI;
+    let thetaSpeed = Math.PI/72;
+    // const yscaleUniformLocation = gl.getUniformLocation(program, 'yscale');    
+    // let yscaler = 0.0;
+
+    // Model matrix definition
+    const mmLoc = gl.getUniformLocation(program, "modelMatrix");
+    const mm = glMatrix.mat4.create();
+    glMatrix.mat4.translate(mm, mm, [0.0, 0.0, -2.0]);
+
+    // View matrix and projection configuration
+    const vmLoc = gl.getUniformLocation(program, 'viewMatrix');
+    const vm = glMatrix.mat4.create();
+    const pmLoc = gl.getUniformLocation(program, 'projectionMatrix');
+    const pm = glMatrix.mat4.create();
+    let camera = {x: 0.0, y: 0.0, z: 0.0};
+    gl.uniformMatrix4fv(vmLoc, false, vm);
+    glMatrix.mat4.perspective(pm,
+      glMatrix.glMatrix.toRadian(90),   // fovy in radian
+      canvas.width/canvas.height,       // aspect ratio
+      0.5,      // near
+      10.0,     // far
+    );
+    gl.uniformMatrix4fv(pmLoc, false, pm);
+
+    // Interactive control using keyboard
+    function onKeyDown(event) {
+      if (event.keyCode == 189) thetaSpeed -= 0.01;       // key '-'
+      else if (event.keyCode == 187) thetaSpeed += 0.01;  // key '='
+      else if (event.keyCode == 48) thetaSpeed = 0;       // key '0'
+      if (event.keyCode == 88) axis[x] = !axis[x];
+      if (event.keyCode == 89) axis[y] = !axis[y];
+      if (event.keyCode == 90) axis[z] = !axis[z];
+      if (event.keyCode == 38) camera.z -= 0.1;
+      else if (event.keyCode == 40) camera.z += 0.1;
+      if (event.keyCode == 37) camera.x -= 0.1;
+      else if (event.keyCode == 39) camera.x += 0.1;
+    }
 
     function render() {
-      theta += 0.0052;
+      theta += 0.001;
+
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+      // Passing theta uniform for rotation within vertex shader
       gl.uniform1f(thetaUniformLocation, theta);
 
-      yscale += yscaler;
-      if(Math.abs(yscale) > 1) {
-        yscaler *= -1;
-        yscale = 0.98;
-      }
+      // Camera view position
+      glMatrix.mat4.lookAt(vm,
+        [0.0, 0.0,  0.0], // Camera position
+        [0.0, 0.0, -2.0], // Camera view direction
+        [0.0, 1.0,  0.0], // Upward camera direction
+      );
 
-      gl.clearColor(0.0, 0.0, 0.0, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      // Rotation using glMatrix
+      glMatrix.mat4.rotateZ(mm, mm, thetaSpeed);
+      glMatrix.mat4.rotateY(mm, mm, thetaSpeed * 2);
+      glMatrix.mat4.rotateX(mm, mm, thetaSpeed);
+      gl.uniformMatrix4fv(mmLoc, false, mm);
 
-      // Rotate for the left side
-      gl.uniform1f(offsetXUniformLocation, 0.5);
-      gl.uniform1f(yscaleUniformLocation, 1);
-      drawA(gl.LINE_LOOP, AOuterVertices);
-      drawA(gl.LINE_LOOP, AInnerVertices);
-
-      // Rotate for the right side
-      gl.uniform1f(thetaUniformLocation, 0);
-      gl.uniform1f(yscaleUniformLocation, yscale);
-      gl.uniform1f(offsetXUniformLocation, -0.5);
-      drawA(gl.TRIANGLES, ABoldOuterVertices);
+      // Drawing
+      gl.drawArrays(gl.TRIANGLES, 0, 36);
 
       requestAnimationFrame(render);
     }
 
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.enable(gl.DEPTH_TEST);
     render();
-  }
-
-  function initPointBuffers() {
-    var vertices = new Float32Array([
-      -0.5, -0.5
-    ]);
-    var n = 1;
-
-    var vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-      console.log('Failed to create the buffer object');
-      return -1;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-    var aPosition = gl.getAttribLocation(program, 'aPosition');
-    if (aPosition < 0) {
-      console.log('Failed to get the storage location of aPosition');
-      return -1;
-    }
-
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(aPosition);
-    return n;
-  }
-
-  function initLineBuffers() {
-    var vertices = new Float32Array([
-      -0.25, -0.25,  -0.25, +0.5
-    ]);
-    var n = 2;
-
-    var vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-      console.log('Failed to create the buffer object');
-      return -1;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-    var aPosition = gl.getAttribLocation(program, 'aPosition');
-    if (aPosition < 0) {
-      console.log('Failed to get the storage location of aPosition');
-      return -1;
-    }
-
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(aPosition);
-    return n;
-  }
-
-  function initTriangleBuffers() {
-    var vertices = new Float32Array([
-      +0.5, -0.5,  0.0, 0.0,  +0.5, 0.0
-    ]);
-    var n = 3;
-
-    var vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-      console.log('Failed to create the buffer object');
-      return -1;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-    var aPosition = gl.getAttribLocation(program, 'aPosition');
-    if (aPosition < 0) {
-      console.log('Failed to get the storage location of aPosition');
-      return -1;
-    }
-
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(aPosition);
-    return n;
-  }
-
-  // Generic format
-  function drawA(type, vertices) {
-    var n = initBuffers(vertices);
-    if (n < 0) {
-      console.log('Failed to set the positions of the vertices');
-      return;
-    }
-    gl.drawArrays(type, 0, n);
-  }
-
-  function initBuffers(vertices) {
-    var n = vertices.length / 2;
-
-    var vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-      console.log('Failed to create the buffer object');
-      return -1;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-    var aPosition = gl.getAttribLocation(program, 'aPosition');
-    if (aPosition < 0) {
-      console.log('Failed to get the storage location of aPosition');
-      return -1;
-    }
-
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(aPosition);
-    return n;
-  }
-
-  function resizer() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    draw();
   }
 
 })(window || this);
