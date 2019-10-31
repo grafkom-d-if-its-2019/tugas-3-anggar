@@ -5,4 +5,4 @@
 
 ## Panduan
 
-Jalankan web server di folder ini. Web server yang dapat digunakan contohnya `http-server` atau dengan menggunakan `npx serve`.
+Untuk demo aplikasi bisa diakses di tautan pada dekripsi repository. Sedangkan untuk diff Tugas 2 yang cukup berbeda dengan Tugas 3, dikarenakan Tugas 3 merupakan pengembangan dari Workshop 3 dengan beberapa elemen dari Tugas 2 yaitu vertex shader dan triangulasi huruf nama depan.
